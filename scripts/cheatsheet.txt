@@ -1,0 +1,5 @@
+# train matchsum
+CUDA_VISIBLE_DEVICES=0,1,2,3 python train_matching.py --mode=train --encoder=roberta --save_path=./models/15ep/ --gpus=0,1,2,3 --accum_count 1 --n_epochs 30 --valid_steps 200 --batch_size 8 --warmup_steps 700 --train_data data-prep1/train.json --dev_data data-prep1/dev.json --test_data data-prep1/test.json --max_lr 0.7e-5 --load-checkpoint tmp/MatchSum_cnndm_roberta.ckpt
+
+# convert bertsumextract predictions to be used with matchsum
+python preprocess/read_bertext_preds.py --input-dir /net/nfs2.corp/s2-research/isabelc/preds/bertsumext-10/ --output data-bertext-prep/ --max_sents 6 --original-dir /net/nfs2.corp/s2-research/isabelc/data/tldr-aic.v2/
