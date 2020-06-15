@@ -17,7 +17,7 @@ from rouge import Rouge
 from fastNLP.core.losses import LossBase
 from fastNLP.core.metrics import MetricBase
 
-_ROUGE_PATH = '/path/to/RELEASE-1.5.5'
+_ROUGE_PATH = '/home/armanc/.files2rouge/'
 
 class MarginRankingLoss(LossBase):      
     
@@ -181,7 +181,7 @@ class MatchRougeMetric(MetricBase):
         log.get_global_console_logger().setLevel(logging.WARNING)
         dec_pattern = '(\d+).dec'
         ref_pattern = '#ID#.ref'
-        cmd = '-c 95 -r 1000 -n 2 -m'
+        cmd = '-c 95 -r 1000 -n 2'
         with tempfile.TemporaryDirectory() as tmp_dir:
             Rouge155.convert_summaries_to_rouge_format(
                 dec_dir, join(tmp_dir, 'dec'))
