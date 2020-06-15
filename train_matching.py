@@ -16,7 +16,7 @@ from metrics import MarginRankingLoss, ValidMetric, MatchRougeMetric
 from callback import MyCallback
 from fastNLP.core.trainer import Trainer
 from fastNLP.core.tester import Tester
-from fastNLP.core.callback import SaveModelCallback
+from fastNLP.core.callback import SaveModelCallback, TensorboardCallback
 
 def configure_training(args):
     devices = [int(gpu) for gpu in args.gpus.split(',')]
@@ -35,7 +35,7 @@ def configure_training(args):
 def train_model(args):
     
     # check if the data_path and save_path exists
-    data_paths = get_data_path(args.mode, args.encoder)
+    data_paths = get_data_path(args.train_data, args.dev_data, args.test_data)
     for name in data_paths:
         assert exists(data_paths[name])
     if not exists(args.save_path):
@@ -56,16 +56,20 @@ def train_model(args):
     print(devices)
 
     # configure model
-    model = MatchSum(args.candidate_num, args.encoder)
+    if args.load_checkpoint is not None:
+        model = torch.load(args.load_checkpoint)
+    else:
+        model = MatchSum(args.candidate_num, args.encoder)
     optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=0)
     
     callbacks = [MyCallback(args), 
-                 SaveModelCallback(save_dir=args.save_path, top=5)]
+                 SaveModelCallback(save_dir=args.save_path, top=5),
+                 TensorboardCallback("loss", "metric")]
     
     criterion = MarginRankingLoss(args.margin)
     val_metric = [ValidMetric(save_path=args.save_path, data=read_jsonl(data_paths['val']))]
     
-    assert args.batch_size % len(devices) == 0
+    # assert args.batch_size % len(devices) == 0
     
     trainer = Trainer(train_data=train_set, model=model, optimizer=optimizer,
                       loss=criterion, batch_size=args.batch_size,
@@ -84,7 +88,7 @@ def test_model(args):
     models = os.listdir(args.save_path)
     
     # load dataset
-    data_paths = get_data_path(args.mode, args.encoder)
+    data_paths = get_data_path(args.train_data, args.dev_data, args.test_data)
     datasets = MatchSumPipe(args.candidate_num, args.encoder).process_from_file(data_paths)
     print('Information of dataset is:')
     print(datasets)
@@ -103,7 +107,8 @@ def test_model(args):
         model = torch.load(join(args.save_path, cur_model))
     
         # configure testing
-        dec_path, ref_path = get_result_path(args.save_path, cur_model)
+        dec_path, ref_path = get_result_path(args.save_path, cur_model, args.result_prefix)
+
         test_metric = MatchRougeMetric(data=read_jsonl(data_paths['test']), dec_path=dec_path, 
                                   ref_path=ref_path, n_total = len(test_set))
         tester = Tester(data=test_set, model=model, metrics=[test_metric], 
@@ -116,7 +121,12 @@ if __name__ == '__main__':
     )
     parser.add_argument('--mode', required=True,
                         help='training or testing of MatchSum', type=str)
-
+    parser.add_argument('--train_data', required=True,
+                        help='path to the preprocessed data', type=str)
+    parser.add_argument('--dev_data', required=True,
+                        help='path to the preprocessed data', type=str)
+    parser.add_argument('--test_data', required=True,
+                        help='path to the preprocessed data', type=str)                                                
     parser.add_argument('--save_path', required=True,
                         help='root of the model', type=str)
     # example for gpus input: '0,1,2,3'
@@ -141,6 +151,8 @@ if __name__ == '__main__':
                         help='total number of training epochs', type=int)
     parser.add_argument('--valid_steps', default=1000,
                         help='number of update steps for validation and saving checkpoint', type=int)
+    parser.add_argument('--load-checkpoint', default=None, type=str)
+    parser.add_argument('--result-prefix', default='', type=str)
 
     args = parser.parse_known_args()[0]
     
